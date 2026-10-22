@@ -1,0 +1,228 @@
+#!/bin/sh
+# lidguard — 只在接通电源时允许「合盖不休眠」的看护脚本
+#
+# 背景（为什么必须用 pmset）：
+#   MacBook 无外接显示器时，合盖休眠无法被 caffeinate / IOPMAssertion 挡住。
+#   唯一有效的开关是 `pmset disablesleep 1`。
+#   但它是【单一全局标志】——不出现在 `pmset -g cap` 里，无法按电源类型区分，
+#   而且会一并禁用 macOS 的「电量过低强制休眠」保护。
+#   所以 `sudo pmset -a disablesleep 1` 开完忘记关，插着电池进包，
+#   就是把机器跑到彻底没电的可靠方式。
+#
+# 本脚本只执行一条规则，且任何「不确定」都倒向「让它睡」：
+#
+#   disablesleep = 1  仅当  已开启 且 接通电源 且 未超时 且 无温度警告
+#   disablesleep = 0  其余所有情况（默认目标就是 0）
+#
+# 设计上的取舍：
+#   * 以 root 身份由 LaunchDaemon 驱动，因此【不需要任何 sudoers 规则】，
+#     也不需要第三方 helper。整机只被这一处改动影响：pmset disablesleep。
+#   * 不安装、不修改任何 agent 配置，不发任何网络请求。
+#   * 重启后自动解除武装（INIT_MARKER），不会有「昨天开了今天忘了」的状态。
+#   * 单次武装最长 8 小时硬上限（可用 `lidguard on 4h` 调整）。
+#
+# 用法：
+#   lidguard on [小时数]   武装（默认 8 小时上限）
+#   lidguard off           立即解除（并立刻恢复休眠）
+#   lidguard status        查看当前判定
+#   lidguard --daemon      内部：LaunchDaemon 每 10 秒调用一次
+#
+# 卸载：
+#   lidguard off && sudo rm -f /Library/LaunchDaemons/com.lidguard.plist \
+#     /usr/local/bin/lidguard && sudo rm -rf /var/run/lidguard.initialized \
+#     ~/.lidguard
+
+set -u
+
+# ---- 可调参数 -------------------------------------------------------------
+POLL_INTERVAL=10
+DEFAULT_MAX_SECONDS=28800          # 单次武装 8 小时硬上限
+THERM_MARKER="No thermal warning level has been recorded"
+INIT_MARKER=/var/run/lidguard.initialized
+LOG_TAG=lidguard
+
+# ---- 基础工具 -------------------------------------------------------------
+
+log() { /usr/bin/logger -t "$LOG_TAG" -- "$*" 2>/dev/null || true; }
+
+dryrun() { [ "${LIDGUARD_DRYRUN:-0}" = "1" ]; }
+
+# 当前是否处于「电源接通」
+on_ac() {
+    /usr/bin/pmset -g ps 2>/dev/null | /usr/bin/grep -q "'AC Power'"
+}
+
+# 当前 disablesleep 是否已被打开（pmset -g 无需 sudo）
+sleep_disabled_now() {
+    if /usr/bin/pmset -g 2>/dev/null | /usr/bin/grep -Eq 'SleepDisabled[[:space:]]+1'; then
+        echo 1
+    else
+        echo 0
+    fi
+}
+
+# 温度是否可接受：没有任何温度警告记录 = 正常；一旦系统记录了警告就停手
+thermal_ok() {
+    /usr/bin/pmset -g therm 2>/dev/null | /usr/bin/grep -q "$THERM_MARKER"
+}
+
+# 武装标记文件路径（跟随当前登录用户）
+arm_file() {
+    _u=$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || echo "")
+    [ -n "$_u" ] || return 1
+    [ "$_u" = "root" ] && return 1
+    echo "/Users/$_u/.lidguard/armed"
+}
+
+# 「立即休眠」请求标记路径（由用户级界面创建，守护进程消费后删除）
+sleepnow_file() {
+    _u=$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || echo "")
+    [ -n "$_u" ] || return 1
+    [ "$_u" = "root" ] && return 1
+    echo "/Users/$_u/.lidguard/sleepnow"
+}
+
+# 读取本次武装的时间预算（秒）。文件内容是纯数字则采用，否则用默认值。
+read_budget() {
+    _v=$(/bin/cat "$1" 2>/dev/null | /usr/bin/tr -cd '0-9')
+    [ -n "$_v" ] || _v=$DEFAULT_MAX_SECONDS
+    echo "$_v"
+}
+
+apply_sleep() {
+    _want="$1"
+    case "$_want" in
+        0|1) : ;;
+        *) log "ERROR: refusing invalid disablesleep value '$_want'"; return 1 ;;
+    esac
+    if dryrun; then
+        log "DRYRUN: would run pmset -a disablesleep $_want"
+        return 0
+    fi
+    if /usr/bin/pmset -a disablesleep "$_want" >/dev/null 2>&1; then
+        log "disablesleep $_want"
+    else
+        log "ERROR: pmset -a disablesleep $_want failed"
+    fi
+}
+
+# ---- 唯一判定规则 ---------------------------------------------------------
+# 结果写入全局变量 DECISION（0 或 1）。
+# 默认 0 = 恢复休眠；任何一个条件不满足都保持 0，永远倒向「让它睡」。
+decide() {
+    DECISION=0
+    _f=$(arm_file 2>/dev/null) || return 0
+    [ -r "$_f" ] || return 0                       # 没武装
+
+    _mtime=$(/usr/bin/stat -f %m "$_f" 2>/dev/null) || return 0
+    _now=$(/bin/date +%s)
+    _age=$(( _now - _mtime ))
+    [ "$_age" -ge 0 ] || return 0                   # 时间异常，宁可睡觉
+
+    # 直接判据：武装时间早于本次开机时间 → 是上次开机前留下的残留，视为未武装。
+    # 这一条不依赖 /var/run 的清空语义，即使 INIT_MARKER 因任何原因残留也不会漏判。
+    # 注意：kern.boottime 输出为 { sec = 1792680450, usec = ... }，
+    #       sed/awk 朴素写法会因贪婪匹配或 BSD 参数差异取错字段，这里用 grep -o 精确截取。
+    _boot=$(/usr/sbin/sysctl -n kern.boottime 2>/dev/null \
+            | /usr/bin/grep -o 'sec = [0-9]*' | /usr/bin/head -1 | /usr/bin/cut -d' ' -f3)
+    if [ -n "$_boot" ] && [ "$_mtime" -lt "$_boot" ]; then
+        return 0                                   # 跨重启残留
+    fi
+
+    [ "$_age" -le "$(read_budget "$_f")" ] || return 0   # 超时
+
+    on_ac        || return 0                       # 没接电源
+    thermal_ok   || return 0                       # 过热
+
+    DECISION=1
+    return 0
+}
+
+# ---- 守护模式（root，每 10 秒一次）--------------------------------------
+daemon_tick() {
+    # 开机后第一次运行：解除一切武装，避免状态跨重启残留
+    if [ ! -e "$INIT_MARKER" ]; then
+        _f=$(arm_file) && /bin/rm -f "$_f" 2>/dev/null
+        dryrun || /bin/touch "$INIT_MARKER" 2>/dev/null
+        log "startup: disarmed"
+    fi
+
+    # 「立即休眠」请求通道。
+    # pmset sleepnow 需要 root，用户级界面无法直接调用，故由界面写标记、本守护进程代为执行。
+    _sf=$(sleepnow_file 2>/dev/null) && [ -e "$_sf" ] && {
+        /bin/rm -f "$_sf" 2>/dev/null
+        dryrun || { /usr/bin/pmset -a disablesleep 0 >/dev/null 2>&1; /usr/bin/pmset sleepnow; }
+        log "sleepnow requested -> forcing sleep"
+        return 0
+    }
+
+    decide
+    _want="$DECISION"
+    _have=$(sleep_disabled_now)
+    if [ "$_want" != "$_have" ]; then
+        apply_sleep "$_want"
+    fi
+}
+
+# ---- 用户 CLI -------------------------------------------------------------
+cmd_on() {
+    _hours="${1:-}"
+    _secs=$DEFAULT_MAX_SECONDS
+    case "$_hours" in
+        ''|*[!0-9]*) : ;;
+        *) _secs=$(( _hours * 3600 )) ;;
+    esac
+    _f=$(arm_file) || { echo "无法确定当前用户目录"; exit 1; }
+    /bin/mkdir -p "$(/usr/bin/dirname "$_f")" || exit 1
+    echo "$_secs" > "$_f" || exit 1
+    if on_ac; then
+        echo "已武装：接通电源时允许合盖不休眠，最长 $(( _secs / 3600 )) 小时。"
+    else
+        echo "已武装，但当前【未接通电源】，合盖仍会正常休眠。插上电源后自动生效。"
+    fi
+    echo "随时可用 'lidguard off' 解除。"
+}
+
+cmd_off() {
+    _f=$(arm_file) && /bin/rm -f "$_f" 2>/dev/null
+    echo "已解除武装。"
+    if [ "$(sleep_disabled_now)" = "1" ]; then
+        echo "提示：系统层面的 disablesleep 仍为开启状态，"
+        echo "      如需立即恢复休眠请执行： sudo pmset -a disablesleep 0"
+    fi
+}
+
+cmd_status() {
+    _f=$(arm_file 2>/dev/null)
+    echo "lidguard 状态"
+    echo "  电源      : $(on_ac && echo '已接通电源 (AC)' || echo '电池供电')"
+    echo "  武装      : $( [ -n "$_f" ] && [ -r "$_f" ] && echo '已武装' || echo '未武装' )"
+    if [ -n "$_f" ] && [ -r "$_f" ]; then
+        _age=$(( $(/bin/date +%s) - $(/usr/bin/stat -f %m "$_f") ))
+        _left=$(( $(read_budget "$_f") - _age ))
+        [ "$_left" -ge 0 ] || _left=0
+        echo "  剩余时间  : $(( _left / 3600 )) 小时 $(( (_left % 3600) / 60 )) 分"
+    fi
+    echo "  温度      : $(thermal_ok && echo '正常' || echo '有警告 —— 将自动放弃保活')"
+    echo "  disablesleep 当前值: $(sleep_disabled_now)  (0=正常 1=已禁用)"
+    echo "  判定结果  : $(decide; echo "$DECISION")  (0=将恢复休眠 1=将保持唤醒)"
+}
+
+# ---- 入口 -----------------------------------------------------------------
+case "${1:-}" in
+    on)          cmd_on "${2:-}" ;;
+    off)         cmd_off ;;
+    status)      cmd_status ;;
+    sleepnow)
+        # 界面无法直接调用需要 root 的 pmset sleepnow，故写标记交给守护进程
+        _sf=$(sleepnow_file) || { echo "无法确定当前用户目录"; exit 1; }
+        /bin/mkdir -p "$(/usr/bin/dirname "$_sf")" || exit 1
+        : > "$_sf"
+        echo "已请求立即休眠，约 10 秒内生效。"
+        ;;
+    --daemon)    daemon_tick ;;
+    *)
+        echo "用法: lidguard on [小时数] | lidguard off | lidguard status | lidguard sleepnow"
+        exit 1
+        ;;
+esac

@@ -1,0 +1,39 @@
+LidGuard · 合盖不休眠
+Copyright (c) 2026 RUI Media CO., LIMITED ／ 香港甄睿傳媒有限公司
+All rights reserved.
+
+保留所有权利
+
+本仓库公开仅供阅读与安全研究。
+
+未授予任何复制、修改、再分发、再许可、商业使用、二次分发或制作衍生作品的许可。
+未经著作权人事先书面许可，不得以任何形式使用本软件。
+
+No permission is granted to use, copy, modify, merge, publish, distribute,
+sublicense, sell, or create derivative works of this software, in whole or in
+part, without the prior written permission of the copyright holder.
+
+本软件按「现状」提供，不附带任何明示或暗示的担保，包括但不限于对适销性、
+特定用途适用性和非侵权性的担保。在任何情况下，著作权人均不对因使用或
+无法使用本软件而产生的任何直接、间接、偶然、特殊或后果性损害承担责任。
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+--------------------------------------------------------------------------------
+
+安全提示 / Security notice
+
+本工具通过 pmset disablesleep 修改 macOS 休眠行为。该开关同时会禁用
+macOS 的「电量过低强制休眠」保护，且其取值持久化于
+/Library/Preferences/com.apple.PowerManagement.plist 并跨重启残留。
+
+安装前请阅读 docs/SAFETY.md。任何时候都应保留以下回滚手段：
+
+    ioreg -r -c IOPMrootDomain | grep SleepDisabled
+    sudo pmset -a disablesleep 0

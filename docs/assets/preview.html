@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>LidGuard 图标预览</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+    background: linear-gradient(160deg,#0F1020,#1A1B34);
+    color:#E8EAF4; padding:48px 56px;
+  }
+  h1 { font-size:26px; font-weight:600; margin-bottom:6px; letter-spacing:-0.3px; }
+  .sub { font-size:14px; color:#9AA0BE; margin-bottom:40px; }
+  h2 { font-size:15px; font-weight:600; color:#B8BEDC; margin:36px 0 16px;
+       padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,.09); }
+  .row { display:flex; align-items:flex-end; gap:36px; margin-bottom:8px; }
+  .cell { text-align:center; }
+  .cell .cap { font-size:11px; color:#7D84A6; margin-top:10px; }
+  /* 菜单栏模拟条 */
+  .mb { border-radius:11px; padding:0 16px; display:flex; align-items:center;
+        gap:15px; height:30px; margin-bottom:14px; width:max-content; }
+  .mb .item { font-size:12.5px; font-weight:500; display:flex; align-items:center; gap:5px; }
+  .mb img { display:block; }
+  .mb-light { background:rgba(255,255,255,.92); }
+  .mb-light .item { color:#1D1D1F; }
+  .mb-dark  { background:rgba(28,28,30,.96); }
+  .mb-dark .item { color:#F2F2F7; }
+  .note { font-size:12px; color:#6E7595; margin-top:10px; line-height:1.7; }
+</style>
+</head>
+<body>
+  <h1>LidGuard 图标</h1>
+  <div class="sub">「合盖，但还醒着」—— 笔记本电脑盖上嵌一个电源符号</div>
+
+  <h2>应用图标（macOS App Icon）</h2>
+  <div class="row">
+    <div class="cell"><img src="icon-app.svg" width="256" height="256"><div class="cap">256 · Dock / 启动台</div></div>
+    <div class="cell"><img src="icon-app.svg" width="128" height="128"><div class="cap">128</div></div>
+    <div class="cell"><img src="icon-app.svg" width="64" height="64"><div class="cap">64</div></div>
+    <div class="cell"><img src="icon-app.svg" width="32" height="32"><div class="cap">32 · Dock 实际尺寸</div></div>
+  </div>
+
+  <h2>菜单栏图标（Template Image）</h2>
+  <div class="mb mb-light">
+    <span class="item"><img src="icon-menubar.svg" width="18" height="18"> LidGuard</span>
+    <span class="item"><img src="icon-menubar.svg" width="18" height="18"> 2h14m</span>
+  </div>
+  <div class="mb mb-dark">
+    <span class="item"><img src="icon-menubar-inv.svg" width="18" height="18"> LidGuard</span>
+    <span class="item"><img src="icon-menubar-inv.svg" width="18" height="18"> 2h14m</span>
+  </div>
+  <div class="row" style="margin-top:22px">
+    <div class="cell"><img src="icon-menubar.svg" width="36" height="36"><div class="cap">36px @2x</div></div>
+    <div class="cell"><img src="icon-menubar.svg" width="18" height="18"><div class="cap">18pt 实际尺寸</div></div>
+    <div class="cell"><img src="icon-menubar.svg" width="18" height="18"><div class="cap">18pt 1x</div></div>
+  </div>
+  <div class="note">
+    菜单栏版本刻意去掉了内部电源符号，只保留粗轮廓的合盖笔记本 ——<br>
+    18pt 下描边加内部细节会糊成一团。语义上的「还醒着」交给菜单栏角标的时长和图标颜色（绿=已武装生效、橙=已武装但电池供电）。<br>
+    菜单栏图标为纯黑单色模板图，系统会按浅色／深色菜单栏自动反色。
+  </div>
+</body>
+</html>

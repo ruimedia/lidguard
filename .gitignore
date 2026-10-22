@@ -1,0 +1,23 @@
+# Swift / Xcode
+.build/
+.swiftpm/
+*.xcodeproj
+*.xcworkspace
+DerivedData/
+*.dSYM/
+
+# 编译产物
+*.o
+*.swiftmodule
+lidguard-probe
+
+# iconutil 的中间目录（可由 docs/assets/make-icons.py + iconutil 重新生成）
+LidGuard.iconset/
+docs/assets/LidGuard.iconset/
+
+# macOS
+.DS_Store
+
+# 本机标记目录（绝不能提交）
+.lidguard/
+stats.json

@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>LidGuard · 菜单栏 UI 设计稿 v2</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, "SF Pro Text", "Helvetica Neue", "PingFang SC", sans-serif;
+    background: #161618; padding: 28px 16px;
+    display:flex; flex-direction:column; align-items:center; gap:44px;
+    overflow-x:hidden;
+  }
+  .cap { color:#8e8e93; font-size:13px; text-align:center; margin-bottom:16px; }
+  .cap b { color:#c7c7cc; font-weight:600; }
+  .stage { width:900px; max-width:100%; border-radius:12px; overflow:hidden; }
+  .wrap { position:relative; }
+
+  .menubar { height:30px; display:flex; align-items:center; padding:0 14px; font-size:13px; gap:18px; }
+  .spacer { flex:1; }
+  .mbar-icon { display:flex; align-items:center; position:relative; }
+
+  .panel { width:344px; margin-left:auto; margin-right:10px; border-radius:12px; overflow:hidden;
+           font-size:13px; position:relative; }
+  .panel::before{ content:''; position:absolute; right:56px; top:-6px; width:12px; height:12px;
+                  transform:rotate(45deg); z-index:0; }
+
+  .dark .menubar { background:rgba(52,52,54,.82); color:#fff; }
+  .dark .panel { background:rgba(48,48,50,.74); color:#fff; backdrop-filter:blur(40px) saturate(180%); box-shadow:0 14px 44px rgba(0,0,0,.5),0 0 0 .5px rgba(255,255,255,.09); }
+  .dark .panel::before { background:rgba(48,48,54,.9); }
+  .light .menubar { background:rgba(246,246,246,.82); color:#000; }
+  .light .panel { background:rgba(250,250,250,.8); color:#000; backdrop-filter:blur(40px) saturate(180%); box-shadow:0 14px 44px rgba(0,0,0,.22),0 0 0 .5px rgba(0,0,0,.08); }
+  .light .panel::before { background:rgba(250,250,250,.95); }
+
+  .dark .sep { background:rgba(255,255,255,.09); } .light .sep { background:rgba(0,0,0,.09); }
+  .dark .secondary { color:rgba(255,255,255,.52); } .light .secondary { color:rgba(0,0,0,.5); }
+  .dark .card { background:rgba(255,255,255,.055); } .light .card { background:rgba(0,0,0,.04); }
+  .dark .label { color:rgba(255,255,255,.4); } .light .label { color:rgba(0,0,0,.4); }
+  .dark .track.on { background:#30D158; } .light .track.on { background:#34C759; }
+  .dark .knob { background:#fff; } .light .knob { background:#fff; }
+  .dark .seg { background:rgba(255,255,255,.08); } .light .seg { background:rgba(0,0,0,.06); }
+  .dark .seg .sel { background:rgba(255,255,255,.16); } .light .seg .sel { background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.12); }
+  .dark .kbd { background:rgba(255,255,255,.1); } .light .kbd { background:rgba(0,0,0,.07); }
+
+  .head { display:flex; align-items:center; justify-content:space-between; padding:11px 14px 10px; }
+  .title { display:flex; align-items:center; gap:7px; font-weight:600; font-size:13.5px; }
+  .pill { font-size:11px; font-weight:600; padding:3px 9px; border-radius:20px; display:flex; align-items:center; gap:5px; }
+  .pill.ok { background:rgba(48,209,88,.18); color:#30D158; }
+  .pill .pd { width:6px;height:6px;border-radius:50%;background:currentColor; }
+  .sep { height:1px; margin:0 14px; }
+  .section { padding:11px 14px 12px; }
+  .label { font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; margin-bottom:8px; }
+
+  .row { display:flex; align-items:center; gap:9px; padding:3px 0; }
+  .row .ic { width:16px; text-align:center; }
+  .row .lbl { flex:1; }
+  .row .val { font-variant-numeric:tabular-nums; font-weight:500; }
+
+  .agent { display:flex; align-items:center; gap:8px; padding:6px 9px; border-radius:7px; margin-bottom:1px; }
+  .agent .nm { flex:1; font-weight:500; font-size:12.5px; }
+  .agent .dur { font-size:11px; font-variant-numeric:tabular-nums; color:#8e8e93; min-width:42px; text-align:right; }
+  .state { font-size:11px; font-weight:600; min-width:34px; text-align:right; }
+  .state.busy{color:#30D158} .state.idle{color:#8E8E93} .state.off{color:#636366}
+  .light .state.busy{color:#248A3D}
+  .bars { display:flex; align-items:flex-end; gap:2px; height:11px; width:26px; }
+  .bars i { width:4px; border-radius:1.5px; height:3px; background:rgba(128,128,128,.28); }
+  .bars i.on { background:#30D158; }
+  .bars i.on:nth-child(1){height:4px} .bars i.on:nth-child(2){height:7px}
+  .bars i.on:nth-child(3){height:9px}  .bars i.on:nth-child(4){height:11px}
+  .light .bars i.on { background:#34C759; }
+
+  .control { display:flex; align-items:center; justify-content:space-between; padding:9px 11px; border-radius:9px; }
+  .control .t { font-weight:600; } .control .s { font-size:11px; margin-top:2px; }
+  .toggle { width:38px;height:22px;border-radius:11px;position:relative;flex-shrink:0; }
+  .track { position:absolute; inset:0; border-radius:11px; background:#48484A; }
+  .knob { position:absolute; top:2px; left:2px; width:18px;height:18px;border-radius:50%; transition:.2s; }
+  .toggle.on .knob { left:18px; }
+  .seg { display:flex; padding:2px; border-radius:7px; gap:2px; }
+  .seg span { padding:4px 10px; border-radius:5px; font-size:12px; font-weight:500; }
+  .seg .sel { font-weight:600; }
+
+  .verdict { margin:0 14px 10px; padding:9px 11px; border-radius:8px; display:flex; align-items:center; gap:8px; font-size:12px; }
+  .dark .verdict { background:rgba(48,209,88,.13); color:#4ADE80; }
+  .light .verdict { background:rgba(52,199,89,.14); color:#1D8A3C; }
+
+  /* 快捷操作 */
+  .qa { display:flex; gap:6px; padding:0 14px 11px; }
+  .qa div { flex:1; text-align:center; padding:7px 4px; border-radius:8px; font-size:11.5px; font-weight:600; }
+
+  /* 统计 */
+  .stats { display:flex; gap:14px; padding:0 14px 11px; }
+  .stat { flex:1; }
+  .stat .n { font-size:19px; font-weight:700; letter-spacing:-.4px; font-variant-numeric:tabular-nums; }
+  .stat .n small { font-size:11px; font-weight:600; margin-left:1px; }
+  .stat .l { font-size:10.5px; margin-top:1px; }
+
+  /* 安全提示入口 */
+  .safe { margin:0 14px 12px; padding:8px 10px; border-radius:8px; display:flex; align-items:center; gap:8px; font-size:11.5px; }
+  .safe .q { width:15px;height:15px;border-radius:50%; display:flex;align-items:center;justify-content:center;
+             font-size:9.5px; font-weight:700; flex-shrink:0; }
+  .safe .go { margin-left:auto; opacity:.55; font-size:11px; }
+
+  .foot { padding:8px 14px 10px; font-size:11px; display:flex; justify-content:space-between; }
+  .foot kbd { font-family:inherit; font-size:10.5px; padding:2px 6px; border-radius:4px; }
+
+  /* ========== 欢迎弹窗 ========== */
+  .welcome { width:330px; border-radius:14px; overflow:hidden; margin:0 auto; font-size:13px; }
+  .dark .welcome { background:rgba(48,48,50,.92); color:#fff; box-shadow:0 20px 60px rgba(0,0,0,.6),0 0 0 .5px rgba(255,255,255,.1); }
+  .light .welcome { background:rgba(250,250,250,.96); color:#000; box-shadow:0 20px 60px rgba(0,0,0,.22),0 0 0 .5px rgba(0,0,0,.08); }
+  .w-top { padding:16px 16px 12px; text-align:center; }
+  .w-moon { font-size:26px; line-height:1; margin-bottom:7px; }
+  .w-h { font-size:15px; font-weight:600; }
+  .w-sub { font-size:12px; margin-top:3px; }
+  .w-list { margin:0 14px; border-radius:9px; padding:9px 11px; }
+  .w-row { display:flex; align-items:center; gap:8px; padding:3px 0; font-size:12.5px; }
+  .w-row .nm { flex:1; font-weight:500; }
+  .w-row .d { font-variant-numeric:tabular-nums; font-weight:600; color:#30D158; }
+  .light .w-row .d { color:#248A3D; }
+  .w-foot { padding:11px 14px 13px; text-align:center; font-size:11px; }
+  .w-btn { margin:9px 14px 0; padding:8px; border-radius:8px; text-align:center; font-weight:600; font-size:12.5px; }
+
+  @media (max-width:940px){.stage{zoom:.86}} @media (max-width:820px){.stage{zoom:.74}}
+  @media (max-width:700px){.stage{zoom:.62}body{padding:22px 10px}}
+  @media (max-width:600px){.stage{zoom:.52}} @media (max-width:500px){.stage{zoom:.44}}
+  @media (max-width:420px){.stage{zoom:.38}}
+</style>
+</head>
+<body>
+
+<!-- ============ 主面板 ============ -->
+<div>
+  <div class="cap"><b>主面板 v2</b> · 新增：预估可用时长 / 快捷操作 / 累计统计 / 安全提示</div>
+  <div class="stage dark">
+    <div class="menubar">
+      <span>MiniMax Code</span><span>文件</span><span>编辑</span><span>显示</span>
+      <span class="spacer"></span>
+      <span>100%</span>
+      <div class="mbar-icon">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#30D158" stroke-width="2" stroke-linecap="round">
+          <rect x="2.5" y="4" width="19" height="12" rx="2"/><path d="M2.5 10.5h19"/></svg>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="head">
+        <div class="title">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#30D158" stroke-width="2.2" stroke-linecap="round">
+            <rect x="2.5" y="4" width="19" height="12" rx="2"/><path d="M2.5 10.5h19"/></svg>
+          LidGuard
+        </div>
+        <div class="pill ok"><span class="pd"></span>已武装</div>
+      </div>
+      <div class="sep"></div>
+
+      <div class="section" style="padding-bottom:8px">
+        <div class="label">电源状态</div>
+        <div class="row"><span class="ic">⚡</span><span class="lbl">电源</span><span class="val" style="color:#30D158">已接通电源</span></div>
+        <div class="row"><span class="ic">🔋</span><span class="lbl">电量</span><span class="val">100%</span></div>
+        <div class="row"><span class="ic">🌡</span><span class="lbl">温度</span><span class="val">正常</span></div>
+        <div class="row"><span class="ic">⏱</span><span class="lbl">预计可用</span><span class="val">7 小时 20 分</span></div>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="section" style="padding-bottom:6px">
+        <div class="label">AI 任务活动</div>
+        <div class="agent card"><span class="nm">WorkBuddy</span>
+          <span class="bars"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></span>
+          <span class="dur">1h42m</span><span class="state busy">活跃</span></div>
+        <div class="agent card"><span class="nm">MiniMax Code</span>
+          <span class="bars"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></span>
+          <span class="dur">2h05m</span><span class="state busy">活跃</span></div>
+        <div class="agent card"><span class="nm">Codex</span>
+          <span class="bars"><i></i><i></i><i></i><i></i></span>
+          <span class="dur">—</span><span class="state off">未运行</span></div>
+        <div class="agent card"><span class="nm">Claude Code</span>
+          <span class="bars"><i class="on"></i><i class="on"></i><i></i><i></i></span>
+          <span class="dur">38m</span><span class="state busy">活跃</span></div>
+        <div class="agent card"><span class="nm">OpenCode</span>
+          <span class="bars"><i></i><i></i><i></i><i></i></span>
+          <span class="dur">—</span><span class="state off">未运行</span></div>
+        <div class="agent card"><span class="nm">Cursor</span>
+          <span class="bars"><i></i><i></i><i></i><i></i></span>
+          <span class="dur">—</span><span class="state off">未运行</span></div>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="section" style="padding-bottom:10px">
+        <div class="control card">
+          <div><div class="t">允许合盖不休眠</div><div class="s secondary">武装后，通电时合盖继续运行</div></div>
+          <div class="toggle on"><div class="track on"></div><div class="knob"></div></div>
+        </div>
+        <div class="control" style="margin-top:8px">
+          <div><div class="t" style="font-size:12.5px">最长保活时长</div></div>
+          <div class="seg"><span>4h</span><span class="sel">8h</span><span>24h</span><span>∞</span></div>
+        </div>
+      </div>
+
+      <div class="verdict">
+        <span>🔓</span><span>已武装 + 已接通电源 → 合盖后机器不会睡眠</span>
+      </div>
+
+      <div class="qa">
+        <div class="card">立即休眠</div>
+        <div class="card">解除武装</div>
+        <div class="card">查看日志</div>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="section" style="padding-bottom:9px">
+        <div class="label">累计守护</div>
+        <div class="stats">
+          <div class="stat"><div class="n">37<small>次</small></div><div class="l secondary">合盖守护</div></div>
+          <div class="stat"><div class="n">126<small>小时</small></div><div class="l secondary">累计守护时长</div></div>
+          <div class="stat"><div class="n">6.3<small>小时</small></div><div class="l secondary">今天</div></div>
+        </div>
+      </div>
+
+      <div class="safe card">
+        <span class="q" style="background:rgba(142,142,147,.25);color:#8e8e93">?</span>
+        <span>忘记关掉怎么办？</span>
+        <span class="go">›</span>
+      </div>
+
+      <div class="foot secondary">
+        <span>本轮已守护 42 分钟</span>
+        <span><span class="kbd">点击图标</span> 面板</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 欢迎弹窗 ============ -->
+<div>
+  <div class="cap" style="margin-bottom:16px"><b>欢迎弹窗</b> · 每次开盖回来时自动弹出</div>
+  <div class="stage dark" style="width:420px">
+    <div class="welcome">
+      <div class="w-top">
+        <div class="w-moon">🌙</div>
+        <div class="w-h">欢迎回来</div>
+        <div class="w-sub secondary">你离开的 <b style="color:#30D158">3 小时 12 分</b> 里，机器一直没睡</div>
+      </div>
+
+      <div class="w-list card">
+        <div class="w-row"><span class="nm">MiniMax Code</span><span class="d">活跃 2 小时 05 分</span></div>
+        <div class="w-row"><span class="nm">WorkBuddy</span><span class="d">活跃 1 小时 42 分</span></div>
+        <div class="w-row"><span class="nm">Claude Code</span><span class="d">活跃 38 分</span></div>
+      </div>
+
+      <div class="w-list card" style="margin-top:7px;padding:8px 11px;font-size:11.5px">
+        <div class="w-row" style="padding:1px 0"><span class="nm secondary">全程接通电源</span><span style="color:#30D158">✓ 未掉电</span></div>
+        <div class="w-row" style="padding:1px 0"><span class="nm secondary">温度</span><span style="color:#30D158">✓ 正常</span></div>
+      </div>
+
+      <div class="w-btn" style="background:#30D158;color:#fff">继续守护（还剩 4 小时 48 分）</div>
+
+      <div class="w-foot secondary" style="padding-top:8px">
+        今天累计 6.3 小时 · 共 37 次 · <span style="color:#30D158">查看每次记录 ›</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 浅色主面板 ============ -->
+<div>
+  <div class="cap" style="margin-bottom:16px"><b>浅色模式</b></div>
+  <div class="stage light">
+    <div class="menubar">
+      <span>MiniMax Code</span><span>文件</span><span>编辑</span><span>显示</span>
+      <span class="spacer"></span><span>100%</span>
+      <div class="mbar-icon">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2" stroke-linecap="round">
+          <rect x="2.5" y="4" width="19" height="12" rx="2"/><path d="M2.5 10.5h19"/></svg>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="head">
+        <div class="title">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2.2" stroke-linecap="round">
+            <rect x="2.5" y="4" width="19" height="12" rx="2"/><path d="M2.5 10.5h19"/></svg>
+          LidGuard
+        </div>
+        <div class="pill ok"><span class="pd"></span>已武装</div>
+      </div>
+      <div class="sep"></div>
+      <div class="section" style="padding-bottom:8px">
+        <div class="label">电源状态</div>
+        <div class="row"><span class="ic">⚡</span><span class="lbl">电源</span><span class="val" style="color:#248A3D">已接通电源</span></div>
+        <div class="row"><span class="ic">🔋</span><span class="lbl">电量</span><span class="val">100%</span></div>
+        <div class="row"><span class="ic">🌡</span><span class="lbl">温度</span><span class="val">正常</span></div>
+        <div class="row"><span class="ic">⏱</span><span class="lbl">预计可用</span><span class="val">7 小时 20 分</span></div>
+      </div>
+      <div class="sep"></div>
+      <div class="section" style="padding-bottom:6px">
+        <div class="label">AI 任务活动</div>
+        <div class="agent card"><span class="nm">WorkBuddy</span>
+          <span class="bars"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></span>
+          <span class="dur">1h42m</span><span class="state busy">活跃</span></div>
+        <div class="agent card"><span class="nm">MiniMax Code</span>
+          <span class="bars"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></span>
+          <span class="dur">2h05m</span><span class="state busy">活跃</span></div>
+        <div class="agent card"><span class="nm">Codex</span>
+          <span class="bars"><i></i><i></i><i></i><i></i></span><span class="dur">—</span><span class="state off">未运行</span></div>
+        <div class="agent card"><span class="nm">Claude Code</span>
+          <span class="bars"><i class="on"></i><i class="on"></i><i></i><i></i></span>
+          <span class="dur">38m</span><span class="state busy">活跃</span></div>
+        <div class="agent card"><span class="nm">OpenCode</span>
+          <span class="bars"><i></i><i></i><i></i><i></i></span><span class="dur">—</span><span class="state off">未运行</span></div>
+        <div class="agent card"><span class="nm">Cursor</span>
+          <span class="bars"><i></i><i></i><i></i><i></i></span><span class="dur">—</span><span class="state off">未运行</span></div>
+      </div>
+      <div class="sep"></div>
+      <div class="section" style="padding-bottom:10px">
+        <div class="control card">
+          <div><div class="t">允许合盖不休眠</div><div class="s secondary">武装后，通电时合盖继续运行</div></div>
+          <div class="toggle on"><div class="track on"></div><div class="knob"></div></div>
+        </div>
+        <div class="control" style="margin-top:8px">
+          <div><div class="t" style="font-size:12.5px">最长保活时长</div></div>
+          <div class="seg"><span>4h</span><span class="sel">8h</span><span>24h</span><span>∞</span></div>
+        </div>
+      </div>
+      <div class="verdict"><span>🔓</span><span>已武装 + 已接通电源 → 合盖后机器不会睡眠</span></div>
+      <div class="qa"><div class="card">立即休眠</div><div class="card">解除武装</div><div class="card">查看日志</div></div>
+      <div class="sep"></div>
+      <div class="section" style="padding-bottom:9px">
+        <div class="label">累计守护</div>
+        <div class="stats">
+          <div class="stat"><div class="n">37<small>次</small></div><div class="l secondary">合盖守护</div></div>
+          <div class="stat"><div class="n">126<small>小时</small></div><div class="l secondary">累计守护时长</div></div>
+          <div class="stat"><div class="n">6.3<small>小时</small></div><div class="l secondary">今天</div></div>
+        </div>
+      </div>
+      <div class="safe card">
+        <span class="q" style="background:rgba(0,0,0,.1);color:#636366">?</span>
+        <span>忘记关掉怎么办？</span><span class="go">›</span>
+      </div>
+      <div class="foot secondary">
+        <span>本轮已守护 42 分钟</span>
+        <span><span class="kbd">点击图标</span> 面板</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
