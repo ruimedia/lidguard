@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    width:1200px; height:460px;
+    background: radial-gradient(1100px 620px at 18% -8%, #2B2F6E 0%, #12132A 46%, #07080F 100%);
+    font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif;
+    color:#EAECF6; display:flex; align-items:center; padding:0 76px;
+    position:relative; overflow:hidden;
+  }
+  .glow { position:absolute; right:-140px; top:-90px; width:620px; height:620px;
+          background:radial-gradient(circle, rgba(255,194,77,.15), transparent 68%); }
+  .icon { width:250px; height:250px; border-radius:56px; margin-right:62px;
+          box-shadow:0 34px 78px rgba(0,0,0,.62), 0 0 0 1px rgba(255,255,255,.10);
+          position:relative; z-index:2; }
+  .txt { position:relative; z-index:2; }
+  h1 { font-size:58px; font-weight:700; letter-spacing:-1.4px; line-height:1.06; }
+  h1 .zh { display:block; font-size:41px; font-weight:600; color:#BFC6EA;
+           letter-spacing:1px; margin-top:11px; }
+  .tag { margin-top:26px; font-size:19.5px; color:#9AA3CC; line-height:1.6; }
+  .en { margin-top:7px; font-size:14.5px; color:#6D76A4; letter-spacing:.3px; }
+  .chips { margin-top:28px; display:flex; gap:9px; }
+  .chip { font-size:12.5px; color:#C3CAE8; background:rgba(255,255,255,.075);
+          border:1px solid rgba(255,255,255,.13); border-radius:20px; padding:5px 14px; }
+</style>
+</head>
+<body>
+  <div class="glow"></div>
+  <img class="icon" src="icon-app.svg">
+  <div class="txt">
+    <h1>LidGuard<span class="zh">合盖不休眠</span></h1>
+    <div class="tag">接通电源才保活，拔电即恢复休眠 —— 为跑长任务的人做的 macOS 菜单栏守卫</div>
+    <div class="en">Keep your Mac awake while the lid is closed. Restores sleep the moment you unplug.</div>
+    <div class="chips">
+      <span class="chip">接通电源才生效</span>
+      <span class="chip">时间硬上限</span>
+      <span class="chip">重启自动解除</span>
+      <span class="chip">不装 hook · 不联网</span>
+    </div>
+  </div>
+</body>
+</html>
