@@ -122,5 +122,22 @@ rm -f "$ARM"
 check "标记文件不存在＝未武装" 0 "$(decide)"
 
 echo
+echo "2) 静态检查"
+# macOS 的 touch 在 /usr/bin/touch，不存在 /bin/touch。
+# 配合 2>/dev/null，这类错误会静默发生 —— 曾因此导致开机解除标记从未生成。
+# 所以任何绝对路径都必须真实存在。
+badpath=$(grep -oE '/(bin|usr/bin|usr/sbin)/[a-z_-]+' "$SRC" \
+          | sort -u \
+          | grep -v '^/bin/lidguard$' \
+          | while read -r p; do [ -x "$p" ] || echo "$p"; done)
+if [ -z "$badpath" ]; then
+    printf "  ✅ %-24s 所有绝对路径均可执行\n" "路径检查"
+    pass=$((pass+1))
+else
+    printf "  ❌ %-24s 以下路径不存在:\n%s\n" "路径检查" "$badpath"
+    fail=$((fail+1))
+fi
+
+echo
 echo "=== 结果：通过 $pass 项，失败 $fail 项 ==="
 [ "$fail" -eq 0 ] || exit 1

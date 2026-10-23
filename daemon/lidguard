@@ -143,7 +143,7 @@ daemon_tick() {
     # 开机后第一次运行：解除一切武装，避免状态跨重启残留
     if [ ! -e "$INIT_MARKER" ]; then
         _f=$(arm_file) && /bin/rm -f "$_f" 2>/dev/null
-        dryrun || /bin/touch "$INIT_MARKER" 2>/dev/null
+        dryrun || /usr/bin/touch "$INIT_MARKER" 2>/dev/null
         log "startup: disarmed"
     fi
 
