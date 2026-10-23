@@ -80,7 +80,7 @@ disablesleep = 0   其余所有情况
 ## 安装
 
 ```bash
-git clone https://github.com/RUI-MEDIA/lidguard.git
+git clone https://github.com/ruimedia/lidguard.git
 cd lidguard
 sudo ./install.sh
 ```
@@ -212,7 +212,7 @@ Any uncertainty resolves to *let it sleep*.
 ### Install
 
 ```bash
-git clone https://github.com/RUI-MEDIA/lidguard.git
+git clone https://github.com/ruimedia/lidguard.git
 cd lidguard
 sudo ./install.sh
 cd app && ./build-app.sh && open .build/LidGuard.app
