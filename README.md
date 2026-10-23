@@ -152,14 +152,24 @@ sudo ./install.sh --uninstall
 ```
 daemon/lidguard        root 守护脚本（判定逻辑唯一所在）
 install.sh             安装 / 卸载脚本
+tools/test-decision.sh 判定逻辑测试（10 项，pmset 打桩，与实时电源状态无关）
+tools/probe.swift      无界面的检测核心，可单独编译运行
 app/                   AppKit 菜单栏 App（Swift）
   Sources/LidGuard/      7 个源文件
   swiftui-draft/         SwiftUI 版本草稿（见下）
-tools/probe.swift       无界面的检测核心，可单独编译运行
 docs/SAFETY.md          安全模型与判定逻辑详解
 docs/assets/            图标 SVG 源文件与生成脚本
 docs/ui-mockup.html     界面设计稿（深浅双色，浏览器直接打开）
 ```
+
+### 跑测试
+
+```bash
+sh tools/test-decision.sh
+```
+
+测试会把守护脚本里的 `pmset` 替换成桩程序，因此**无论机器当前插没插电都得到同样结果**，
+可以在 CI 里跑。它只改动 `~/.lidguard/armed`，测完自动还原原状态。
 
 ### 为什么界面用 AppKit 而不是 SwiftUI
 
