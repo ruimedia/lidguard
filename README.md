@@ -240,7 +240,15 @@ LidGuard --diagnose
 
 ```bash
 LidGuard --diagnose --force-battery   # 把电源读数当成电池供电，验证「不通电就隐藏图标」
+LidGuard --verify-menubar             # 走完整 GUI 路径，真实测一遍图标显隐
 LidGuard --self-test                  # 验证两个二级窗口点击后是否还活着
+```
+
+`--verify-menubar` 会依次测两次并给出结论：
+
+```
+接电源时（实际读数 AC）菜单栏图标：符合规则 ✅
+电池供电时菜单栏图标：已隐藏 ✅
 ```
 
 ## 随时检查与回滚
@@ -550,7 +558,15 @@ Two developer switches are included as well:
 
 ```bash
 LidGuard --diagnose --force-battery   # pretend you're on battery, to check the hide rule
+LidGuard --verify-menubar             # walk the full GUI path and really toggle the icon
 LidGuard --self-test                  # check that the two secondary windows survive a click
+```
+
+`--verify-menubar` measures twice and reports the verdict:
+
+```
+接电源时（实际读数 AC）菜单栏图标：符合规则 ✅
+电池供电时菜单栏图标：已隐藏 ✅
 ```
 
 ### Verify and roll back at any time

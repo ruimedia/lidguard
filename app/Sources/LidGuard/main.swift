@@ -25,6 +25,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ n: Notification) {
         // 命令行模式（--diagnose / --login）是无界面工具：
+        // --force-battery：把电源读数强行当成电池供电，
+        // 用来验证「不通电时菜单栏图标自动消失」这条规则。
+        // 必须放在命令行分支之前，否则命令行模式下不生效。
+        if CommandLine.arguments.contains("--force-battery") {
+            monitor.forceBattery = true
+        }
+
         // 不抢单实例锁、不建状态项，免得和正在运行的实例互相踢。
         if let cli = parseCLI() {
             NSApp.setActivationPolicy(.prohibited)
@@ -92,11 +99,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             runSelfTest()
         }
 
-        // --force-battery：把电源读数强行当成电池供电，
-        // 用来验证「不通电时菜单栏图标自动消失」这条规则。
-        if CommandLine.arguments.contains("--force-battery") {
-            monitor.forceBattery = true
+        // 强制电池模式下补一次采样，让首帧就是「电池供电」
+        if monitor.forceBattery {
             monitor.refresh()
+        }
+
+        // --verify-menubar：在真实 GUI 路径里实测「通电显示 / 断电隐藏」这条规则。
+        // --diagnose 是无界面模式，看不到状态项本身，所以另开一个走完整路径的。
+        if CommandLine.arguments.contains("--verify-menubar") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+                self?.verifyMenuBarRule()
+            }
+        }
+    }
+
+    /// 依次测两次：真实电源状态下的显隐 → 强制电池后的显隐。
+    private func verifyMenuBarRule() {
+        let onAC = monitor.system.onAC
+        let visibleOnAC = statusItem.isVisible
+        print("接电源时（实际读数 \(onAC ? "AC" : "电池")）菜单栏图标："
+              + (visibleOnAC == onAC ? "符合规则 ✅" : "不符合规则 ❌"))
+
+        monitor.forceBattery = true
+        monitor.refresh()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            guard let self else { return }
+            let visibleOnBattery = self.statusItem.isVisible
+            print("电池供电时菜单栏图标："
+                  + (visibleOnBattery ? "仍然显示 ❌" : "已隐藏 ✅"))
+            NSApp.terminate(nil)
         }
     }
 
