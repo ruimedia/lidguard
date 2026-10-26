@@ -42,6 +42,9 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundleVersion</key><string>1</string>
     <key>LSMinimumSystemVersion</key><string>13.0</string>
     <key>LSUIElement</key><true/>
+    <!-- 禁止多开：登录项自启与手动点开撞车时，LaunchServices 会把第二次启动
+         变成「叫醒已有实例」，从而只保留一个菜单栏图标。 -->
+    <key>LSMultipleInstancesProhibited</key><true/>
 </dict>
 </plist>
 PLIST

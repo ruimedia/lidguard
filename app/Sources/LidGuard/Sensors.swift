@@ -177,7 +177,7 @@ func probeAgents(specs: [AgentSpec],
         var detail = "进程在运行，暂无新活动"
         if fileFresh {
             state = .busy; level = 4
-            detail = "日志/会话文件 \(Int(age ?? 0)) 秒前有写入"
+            detail = "活动文件 \(Int(age ?? 0)) 秒前有写入"
         } else if cpuDelta > 1.5 {
             state = .busy; level = 3
             detail = String(format: "CPU 本轮消耗 %.1fs", cpuDelta)

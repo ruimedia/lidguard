@@ -97,7 +97,15 @@ var agentSpecs: [AgentSpec] {
         AgentSpec("Cursor",
                   hints: ["/Cursor.app/"],
                   paths: [home + "/Library/Application Support/Cursor/User/workspaceStorage"],
-                  fresh: 90, depth: 3)
+                  fresh: 90, depth: 3),
+        // Muse（Meta，bundle id com.meta.endo）：analytics 事件库上传后即清空，
+        // device-v1.json 会自己停摆；最稳的是 preferences plist（约 30 秒写一次）。
+        AgentSpec("Muse",
+                  hints: ["/Muse.app/"],
+                  paths: [home + "/Library/Preferences/com.meta.endo.plist",
+                          home + "/Library/Caches/com.meta.endo/AuthRollout/com.meta.endo/device-v1.json",
+                          home + "/Library/Application Support/com.meta.endo/analytics/unified_micro_batch"],
+                  fresh: 180, depth: 1)
     ]
 }
 

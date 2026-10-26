@@ -49,7 +49,29 @@ enum AgentSpecs {
             AgentSpec("Cursor",
                       hints: ["/Cursor.app/"],
                       paths: [h + "/Library/Application Support/Cursor/User/workspaceStorage"],
-                      fresh: 90, depth: 3)
+                      fresh: 90, depth: 3),
+            // Muse（Meta 出品，bundle id com.meta.endo）
+            //
+            // 活动信号挑了两轮才挑对，这里把踩过的坑记下来：
+            //
+            // 1) analytics 的事件库（FBAnalyticsUnifiedEventStore）看着最像
+            //    「用户交互日志」，但 analytics_events 表长期是 0 行——事件上传成功后
+            //    就被清掉了。只剩 WAL 文件偶尔的一次性时间戳，当判据只会得到死数字。
+            //
+            // 2) AuthRollout 里的 device-v1.json 前 35 分钟确实是标准心跳（约 61 秒一次），
+            //    但实测它会自己停摆（连续 8 分钟不再写入），不能单独依赖。
+            //
+            // 3) 真正稳定的是 ~/Library/Preferences/com.meta.endo.plist：
+            //    Muse 进程在跑时约每 30 秒写一次（cfprefsd 代写），进程一停就停。
+            //
+            // 所以以 prefs 为主判据，device-v1.json 与 analytics 目录作为兜底，
+            // 任一有近期写入都算「活着」。
+            AgentSpec("Muse",
+                      hints: ["/Muse.app/"],
+                      paths: [h + "/Library/Preferences/com.meta.endo.plist",
+                              h + "/Library/Caches/com.meta.endo/AuthRollout/com.meta.endo/device-v1.json",
+                              h + "/Library/Application Support/com.meta.endo/analytics/unified_micro_batch"],
+                      fresh: 180, depth: 1)
         ]
     }
 }

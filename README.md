@@ -89,6 +89,15 @@
 **⑩ 判定逻辑只有一处。**
 界面进程没有任何特权，它写的只是一个「用户希望保持清醒」的标记文件；真正的 `pmset` 调用由 launchd 以 root 身份执行。**判定逻辑不在界面里**，所以界面不可能偷偷改判。
 
+**⑪ 不会开出两个自己。**
+开机自启 + 你手欠又点了一次「应用程序」，是两个实例、两个菜单栏图标、两套轮询互相覆盖统计。所以用一把 `flock` 排他锁：拿到锁的才是主实例，拿不到的直接退出并把已在跑的那个叫醒。
+
+**⑫ 电池供电时图标会消失，但面板依然打得开。**
+图标藏起来之后不该把入口也藏没了。所以面板的弹出锚点是 App 自建的 1×1 隐形窗口，不依赖菜单栏按钮 —— 从「应用程序」里再点一次 LidGuard，面板就出现在屏幕右上角。
+
+**⑬ Muse 的心跳挑了两轮。**
+第一轮选了 analytics 事件库，打开一看事件表是空的（上传完就清）；第二轮选了 `device-v1.json`，前 35 分钟是标准心跳，结果它会自己停摆。最后落在 preferences plist —— 约 30 秒写一次，进程一停就停。**选信号这种事，不实测到底就不知道哪个是真的。**
+
 ---
 
 ## 为什么需要它
@@ -175,12 +184,64 @@ open .build/LidGuard.app
 
 回来时菜单栏图标旁会显示本次离开的时长。
 
+### 菜单栏常驻规则
+
+**接通电源时**图标常驻在菜单栏；**电池供电时**自动隐藏，不占位置。
+
+这条规则是自动的，不需要手动设置。拔掉电源图标会消失，插回电源它自己回来。
+
+图标隐藏时如果想打开面板，从「应用程序」里再点一次 LidGuard 就行（面板会出现在屏幕右上角）。
+
+### 开机自动启动
+
+面板里的「开机自动启动」开关控制它。打开之后，登录系统就会自动运行 LidGuard。
+
+实现上优先用系统的 `SMAppService.mainApp`（注册后会出现在「系统设置 → 通用 → 登录项」里，你可以随时自己关掉）；如果当前这个 App 不是正规签名、注册失败，会自动退回到写一个用户级 `LaunchAgent`，功能一样。
+
+也可以用命令行：
+
+```bash
+LidGuard --login on      # 开启
+LidGuard --login off     # 关闭
+LidGuard --login status  # 查看当前状态
+```
+
 | 命令 | 作用 |
 |---|---|
 | `lidguard on [小时数]` | 武装（默认 8 小时上限） |
 | `lidguard off` | 立即解除，并立刻恢复休眠 |
 | `lidguard status` | 查看当前判定结果和原因 |
 | `lidguard --daemon` | 内部：LaunchDaemon 调用入口 |
+
+### 排障命令
+
+App 自带一个诊断模式，把电源判定、agent 活动、菜单栏规则、登录项状态一次打印出来：
+
+```bash
+LidGuard --diagnose
+```
+
+输出长这样：
+
+```
+=== LidGuard 诊断 ===
+电源         : 已接通电源 (AC)
+电量         : 100%   温度: 正常
+禁睡         : 是
+武装         : 已武装
+菜单栏图标   : 期望=显示 实际=显示 ✅ 一致
+登录项       : 登录后自动启动
+--- AI 任务活动 ---
+  ● WorkBuddy      活跃  活动文件 0 秒前有写入
+  ● Muse           活跃  活动文件 14 秒前有写入
+```
+
+还有两个给开发用的开关：
+
+```bash
+LidGuard --diagnose --force-battery   # 把电源读数当成电池供电，验证「不通电就隐藏图标」
+LidGuard --self-test                  # 验证两个二级窗口点击后是否还活着
+```
 
 ## 随时检查与回滚
 
@@ -212,8 +273,19 @@ sudo ./install.sh --uninstall
 | Claude Code | `~/.claude/projects` 写入时间 |
 | OpenCode | `~/.opencode`、`~/.local/share/opencode` |
 | Cursor | `~/Library/Application Support/Cursor/User/workspaceStorage` |
+| Muse | `~/Library/Preferences/com.meta.endo.plist` 写入时间 |
 
 判定方式为**日志写入时间 + CPU 活动度**双重信号。
+
+### 关于 Muse 的信号选择
+
+Muse（Meta，bundle id `com.meta.endo`）的信号挑了两轮才挑对。
+
+第一轮候选是 `~/Library/Application Support/com.meta.endo/analytics/unified_micro_batch` —— 一个叫 `FBAnalyticsUnifiedEventStore.sqlite` 的事件库，名字里就写着「analytics event store」。实际打开一看，`analytics_events` 表**长期是 0 行**：事件上传成功后就被清掉了，只剩 WAL 文件偶尔的一次性时间戳。当判据只会得到一个死数字。
+
+第二轮是 `~/Library/Caches/com.meta.endo/AuthRollout/com.meta.endo/device-v1.json`：Muse 进程在跑时**每约 61 秒写一次**，前 35 分钟确实是标准心跳。但实测它会自己停摆 —— 连续 8 分钟不再写入，单独依赖它不可靠。
+
+最终落在 `~/Library/Preferences/com.meta.endo.plist`：Muse 进程在跑时约**每 30 秒写一次**（cfprefsd 代写），进程一停就停，是三个候选里唯一稳定的。所以以它为主判据，device-v1.json 与 analytics 目录作兜底。
 
 ## 仓库结构
 
@@ -223,7 +295,7 @@ install.sh              安装 / 卸载脚本
 tools/test-decision.sh  判定逻辑测试（11 项，pmset 打桩）
 tools/probe.swift       无界面的检测核心，可单独编译运行
 app/                    AppKit 菜单栏 App（Swift）
-  Sources/LidGuard/      7 个源文件
+  Sources/LidGuard/      9 个源文件
   swiftui-draft/         SwiftUI 版本草稿（见下）
 docs/SAFETY.md          安全模型与判定逻辑详解
 docs/assets/            图标 SVG 源文件与生成脚本
@@ -260,6 +332,38 @@ sh tools/test-decision.sh
   （保持清醒 ≠ 可远程唤醒）
 - 若守护进程在 `disablesleep=1` 期间崩溃，该值会持续到下次手动纠正；
   8 小时硬上限把最坏情况限制在 8 小时内
+
+### macOS 27 上菜单栏图标不出现（系统级问题）
+
+在 **macOS 27.0.1 (26A434)** 上实测：`NSStatusItem` 创建成功、`button` 非空、
+MenuBarAgent 日志里场景已注册且事件转发成功，但**屏幕上就是没有图标**。
+
+这不是 LidGuard 的代码问题。已逐项排除：
+
+| 怀疑 | 实测结果 |
+|---|---|
+| `LSUIElement=true` 导致 | 改成 `false`（有 Dock 图标）一样不显示 |
+| 激活策略 `.accessory` 导致 | 保持 `.regular` 一样不显示 |
+| 状态项创建时机导致 | `applicationWillFinishLaunching` / `run()` 之前 / 延迟创建，三种都不显示 |
+| `autosaveName` 被标记为已移除 | 换全新 `autosaveName` 不显示 |
+| 代码签名不够正规 | `TAG.app` 同样是 ad-hoc 签名，它的图标正常显示 |
+| 最小复现 | 10 行代码的最小 App 同样不显示 |
+
+已排除的方法：重启 `MenuBarAgent`（`killall MenuBarAgent`）不能解决，
+反而可能让整个菜单栏短暂消失。
+
+**目前有效的解法是注销重登或重启**，让状态项在登录序列里创建。
+打开「开机自动启动」后，登录时它会随系统一起启动，图标通常就正常了。
+
+作为兜底，即使菜单栏没有图标，面板依然打得开：
+从「应用程序」里再点一次 LidGuard，面板会出现在屏幕右上角。
+（面板的弹出锚点是 App 自建的一个 1×1 隐形窗口，不依赖菜单栏按钮。）
+
+### 电源状态判定用的是 `pmset -g ps`
+
+Apple Silicon 上 `IOPSCopyPowerSourcesList` 只返回 `InternalBattery`，
+AC 适配器根本不在列表里，判不出「有没有插电」。所以电源来源改用
+`pmset -g ps` 判断 `'AC Power'`，已与 `pmset` 输出交叉验证一致。
 
 ---
 ---
@@ -357,6 +461,23 @@ all — it writes a marker file saying "the user wants to stay awake". The actua
 `pmset` call is made by launchd as root. **The verdict isn't in the UI**, so the UI
 can't quietly change it.
 
+**It never opens two of itself.** A login item plus an impatient double-click on
+Applications means two instances, two menu bar icons, and two polling loops fighting
+over the same stats file. An exclusive `flock` settles it: whoever holds the lock is
+the main instance, the other exits and wakes the one already running.
+
+**The icon disappears on battery, but the panel stays reachable.** Hiding the icon
+shouldn't hide the way in. The panel anchors to a 1×1 invisible window the app creates
+itself, not to the menu bar button — click LidGuard again in Applications and the panel
+appears in the top-right corner.
+
+**Muse's heartbeat took two attempts.** First we picked the analytics event store, then
+opened it and found the events table empty (they're deleted after upload). Then we
+picked `device-v1.json`, a proper 61-second heartbeat — until it stopped on its own.
+What actually held up was the preferences plist: written roughly every 30 seconds, and
+it stops the moment the process does. **You don't know which signal is real until you
+watch it for a while.**
+
 ### Install
 
 ```bash
@@ -374,11 +495,63 @@ cd app && ./build-app.sh && open .build/LidGuard.app
 
 When you come back, the menu bar shows how long you were gone.
 
+#### When the menu bar icon shows
+
+The icon **stays in the menu bar while you're on AC power** and **disappears when you're
+on battery** — no configuration needed. Unplug and it goes; plug back in and it returns.
+
+If the icon is hidden and you still want the panel, click LidGuard again in
+Applications — the panel appears in the top-right corner of the screen.
+
+#### Launch at login
+
+The "Launch at login" switch in the panel controls it. Once on, LidGuard starts
+automatically when you log in.
+
+Under the hood it prefers Apple's `SMAppService.mainApp` (the entry then shows up under
+System Settings → General → Login Items, where you can switch it off yourself). If the
+app isn't properly signed and that registration fails, it falls back to writing a
+user-level `LaunchAgent` — same behaviour, different place to look.
+
+```bash
+LidGuard --login on      # enable
+LidGuard --login off     # disable
+LidGuard --login status  # show current state
+```
+
 | Command | What it does |
 |---|---|
 | `lidguard on [hours]` | Arm it (default 8-hour cap) |
 | `lidguard off` | Disarm and restore sleep immediately |
 | `lidguard status` | Show the current verdict and why |
+
+#### Troubleshooting
+
+```bash
+LidGuard --diagnose
+```
+
+Prints the power verdict, agent activity, the menu bar rule and the login item state in
+one go:
+
+```
+=== LidGuard 诊断 ===
+电源         : 已接通电源 (AC)
+禁睡         : 是
+武装         : 已武装
+菜单栏图标   : 期望=显示 实际=显示 ✅ 一致
+登录项       : 登录后自动启动
+--- AI 任务活动 ---
+  ● WorkBuddy      活跃  活动文件 0 秒前有写入
+  ● Muse           活跃  活动文件 14 秒前有写入
+```
+
+Two developer switches are included as well:
+
+```bash
+LidGuard --diagnose --force-battery   # pretend you're on battery, to check the hide rule
+LidGuard --self-test                  # check that the two secondary windows survive a click
+```
 
 ### Verify and roll back at any time
 
@@ -402,6 +575,34 @@ sudo ./install.sh --uninstall
   the same as being remotely wakeable.
 - If the daemon crashes while `disablesleep=1`, the value persists until someone
   corrects it. The 8-hour cap bounds that window.
+
+#### On macOS 27 the menu bar icon may not appear (system-level issue)
+
+Measured on **macOS 27.0.1 (26A434)**: the `NSStatusItem` is created successfully, the
+button is not nil, MenuBarAgent logs the scene registration and forwards events — and
+yet **nothing shows up on screen**.
+
+This is not a LidGuard bug. Each candidate cause was ruled out by testing:
+
+| Suspect | Result |
+|---|---|
+| `LSUIElement=true` | `false` (with a Dock icon) doesn't show it either |
+| `.accessory` activation policy | `.regular` doesn't show it either |
+| When the item is created | before `run()`, in `applicationWillFinishLaunching`, or delayed — none work |
+| `autosaveName` remembered as removed | a brand-new `autosaveName` doesn't show it either |
+| Not formally signed | `TAG.app` is ad-hoc signed too, and its icon renders fine |
+| Something specific to our app | a 10-line minimal App doesn't show it either |
+
+Restarting `MenuBarAgent` (`killall MenuBarAgent`) does **not** help, and can briefly
+take the whole menu bar away.
+
+**Logging out and back in (or rebooting) does help** — the item then gets created during
+the login sequence. Turning on "Launch at login" means it starts with the system, and
+the icon normally shows up from then on.
+
+As a fallback the panel still opens even with no menu bar icon: click LidGuard again in
+Applications and it appears in the top-right corner. (The panel anchors to a 1×1
+invisible window the app creates itself, not to the menu bar button.)
 
 ---
 ---

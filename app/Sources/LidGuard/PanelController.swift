@@ -235,6 +235,10 @@ final class PanelViewController: NSViewController {
     private let segControl = NSSegmentedControl()
     private var selectedHours: Double = 8
 
+    private let loginSwitch = NSSwitch()
+    private let loginDetail = UI.secondary(11)
+    private let login: LoginItemManager = LoginItemManager.shared
+
     private let verdictBox = NSView()
     private let verdictIcon = NSImageView()
     private let verdictLabel = UI.label("", size: 12)
@@ -267,6 +271,8 @@ final class PanelViewController: NSViewController {
             buildControls(),
             buildVerdict(),
             buildQuickActions(),
+            UI.separator(),
+            buildSettings(),
             UI.separator(),
             buildStats(),
             buildSafety(),
@@ -356,6 +362,24 @@ final class PanelViewController: NSViewController {
                             UI.spacer(), segControl])
 
         return UI.vstack([card1, h2], spacing: 8, top: 10, bottom: 10)
+    }
+
+    private func buildSettings() -> NSView {
+        loginSwitch.target = self
+        loginSwitch.action = #selector(loginSwitchChanged)
+        loginSwitch.controlSize = .small
+
+        let text = UI.vstack([
+            UI.label("开机自动启动", size: 13, weight: .semibold),
+            loginDetail
+        ], spacing: 2)
+        let card = UI.card(UI.hstack([text, UI.spacer(), loginSwitch]))
+        card.widthAnchor.constraint(equalToConstant: 344 - UI.padX * 2).isActive = true
+
+        let hint = UI.label("接通电源时图标常驻在菜单栏，电池供电时自动隐藏",
+                            size: 11, color: .secondaryLabelColor)
+
+        return UI.vstack([card, hint], spacing: 8, top: 10, bottom: 10)
     }
 
     private func buildVerdict() -> NSView {
@@ -455,6 +479,33 @@ final class PanelViewController: NSViewController {
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.refreshFooter() }
             .store(in: &cancellables)
+
+        login.$state
+            .receive(on: RunLoop.main)
+            .sink { [weak self] st in self?.applyLoginState(st) }
+            .store(in: &cancellables)
+        login.$detail
+            .receive(on: RunLoop.main)
+            .sink { [weak self] d in self?.loginDetail.stringValue = d }
+            .store(in: &cancellables)
+    }
+
+    private func applyLoginState(_ st: LoginItemState) {
+        switch st {
+        case .enabled:
+            loginSwitch.state = .on
+            loginSwitch.isEnabled = true
+        case .disabled:
+            loginSwitch.state = .off
+            loginSwitch.isEnabled = true
+        case .needsApproval:
+            // 已注册但系统要求用户放行：开关显示为开，但不让再点
+            loginSwitch.state = .on
+            loginSwitch.isEnabled = false
+        case .failed:
+            loginSwitch.state = .off
+            loginSwitch.isEnabled = true
+        }
     }
 
     private func refresh() {
@@ -534,6 +585,9 @@ final class PanelViewController: NSViewController {
         if mon.isArmed { mon.setArmed(true, hours: selectedHours) }
     }
     @objc private func sleepNowTapped() { mon.sleepNow() }
+    @objc private func loginSwitchChanged() {
+        login.setEnabled(loginSwitch.state == .on)
+    }
     @objc private func disarmTapped() {
         mon.setArmed(false, hours: 0)
         toggle.state = .off

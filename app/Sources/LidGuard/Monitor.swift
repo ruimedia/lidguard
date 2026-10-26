@@ -13,6 +13,15 @@ final class Monitor: ObservableObject {
     @Published var elapsed: Double = 0
     /// 菜单栏角标：离开超过 2 分钟才显示摘要，避免短时间打扰
     @Published var badge: String = ""
+    /// 是否已经拿到过真实采样。
+    /// 初始的 system 是占位值（onAC=false），不能拿它去判断菜单栏图标显不显示，
+    /// 否则开机那一瞬会先把图标藏起来再放出来。
+    @Published private(set) var hasSampled = false
+
+    /// 测试开关：强制把电源读数当成「电池供电」。
+    /// 用来验证「不通电时菜单栏图标自动消失」这条规则——
+    /// 真机上要拔电源才能验证，太麻烦。
+    var forceBattery = false
 
     /// 最近一次离开时长（用于角标）。由显示层根据内部显示休眠状态推断。
     @Published var lastAwaySeconds: Double = 0
@@ -66,6 +75,8 @@ final class Monitor: ObservableObject {
 
     private func apply(sys: SystemSnapshot, ags: [AgentState], dt: Double,
                        arm: (isArmed: Bool, remaining: Double, elapsed: Double)) {
+        var sys = sys
+        if forceBattery { sys.onAC = false }
         system = sys
         isArmed = arm.isArmed
         remaining = arm.remaining
@@ -104,6 +115,8 @@ final class Monitor: ObservableObject {
         } else {
             badge = ""
         }
+
+        hasSampled = true
     }
 
     // MARK: - 用户操作
